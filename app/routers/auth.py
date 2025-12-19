@@ -1,11 +1,16 @@
 from typing import Annotated
-from app.schemas.auth import UserRegister, UserResponse
-from fastapi.routing import APIRouter
-from app.dependencies import get_db
-from fastapi import Depends, HTTPException, status
+from datetime import datetime, timedelta
+
 from sqlalchemy.orm import Session
+from fastapi.routing import APIRouter
+from fastapi import Depends, HTTPException, status
+
+from app.schemas.users import UserRegister, UserResponse
+from app.schemas.auth import UserLogin, TokenResponse
+from app.dependencies import get_db
 from app.models.users import Users 
-from app.core.security import hash_password
+from app.models.authtoken import AuthToken 
+from app.core.security import hash_password, verify_password, generate_token
 
 router = APIRouter(prefix='/api/auth', tags=['Auth'])
 
@@ -26,3 +31,19 @@ def register(user_data: UserRegister, db:Annotated[Session, Depends(get_db)]):
     db.commit()
     db.refresh(new_user)
     return new_user
+
+@router.post('/login', response_model=TokenResponse)
+def login(credentials: UserLogin, db: Annotated[Session, Depends(get_db)]):
+    user = db.query(Users).filter(Users.username==credentials.username).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials. (Username)")
+
+    if not verify_password(credentials.password, user.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials (Password).")
+    
+    token = AuthToken(token=generate_token(), expires_date=datetime.now()+timedelta(days=7), user_id=user.user_id)
+    
+    db.add(token)
+    db.commit()
+    db.refresh(token)
+    return token
