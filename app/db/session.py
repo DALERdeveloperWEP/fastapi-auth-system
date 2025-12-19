@@ -4,9 +4,11 @@ from sqlalchemy.orm import sessionmaker
 
 SessionLocal = sessionmaker(bind=engine)
 
-def get_db():
+def get_session():
     db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    return db
+    # try:
+    #     yield db
+    # finally:
+    #     db.close()
+    
